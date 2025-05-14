@@ -32,8 +32,7 @@
         default = pkgs.mkShell {
           packages = [
             pkgs.idris2
-            pkgs.asciinema
-            pkgs.idris2Packages.idris2Lsp
+            pkgs.asciinema_3
           ];
         };
       });
