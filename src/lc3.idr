@@ -16,6 +16,23 @@ record Memory where
   constructor MkMemory
   array : IOArray Int
 
+toString : Memory -> IO String
+toString (MkMemory arr) = do aux arr 0 ""
+  where
+    aux : IOArray Int -> Int -> String -> IO String
+    aux arr pos acc =
+      if pos + 1 == memorySize then
+        pure acc
+      else do
+        opcode <- IOArray.readArray arr pos
+        case opcode of
+          Nothing => aux arr (pos + 1) acc
+          Just opcode =>
+            if opcode == 0 then
+              aux arr (pos + 1) acc
+            else
+              aux arr (pos + 1) ("\{acc}\n\{show opcode}")
+
 readImage : String -> IO (Maybe Memory)
 readImage path = do
   Just originBuffer <- Buffer.newBuffer 2
@@ -67,7 +84,9 @@ executeCommand (Disassemble file) = do
   Just image <- readImage file
     | Nothing => putStrLn "Could not read file \{show file}"
 
-  putStrLn "read buffer"
+  out <- toString image
+
+  putStrLn out
 
 executeCommand Help = do
   putStrLn "Supported commands\n\nlc3 disassemble [file]"
