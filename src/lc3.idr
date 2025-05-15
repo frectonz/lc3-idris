@@ -62,23 +62,11 @@ parseCommand : List String -> Command
 parseCommand [_, "disassemble", file] = Disassemble file
 parseCommand _ = Help
 
-readFile : String -> IO (Maybe Buffer)
-readFile path = do
-  Just buffer <- Buffer.newBuffer memorySize
-    | Nothing => pure Nothing
-
-  Right _ <- Handle.withFile path Read
-                      (\err => pure err)
-                      (\file => Buffer.readBufferData file buffer 0 memorySize)
-    | Left err => pure Nothing
-  pure (Just buffer)
-
 executeCommand : Command -> IO ()
 executeCommand (Disassemble file) = do
-  Just buffer <- readFile file
+  Just image <- readImage file
     | Nothing => putStrLn "Could not read file \{show file}"
 
-  origin <- Buffer.getBits16 buffer 0
   putStrLn "read buffer"
 
 executeCommand Help = do
