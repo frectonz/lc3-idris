@@ -14,12 +14,12 @@ memorySize = shiftL 1 16
 
 record Memory where
   constructor MkMemory
-  array : IOArray Int
+  array : IOArray Bits16
 
 toString : Memory -> IO String
-toString (MkMemory arr) = do aux arr 0 ""
+toString (MkMemory arr) = aux arr 0 ""
   where
-    aux : IOArray Int -> Int -> String -> IO String
+    aux : IOArray Bits16 -> Int -> String -> IO String
     aux arr pos acc =
       if pos + 1 == memorySize then
         pure acc
@@ -59,13 +59,13 @@ readImage path = do
 
   pure $ Just $ MkMemory memory
   where
-    bufferToArray : (origin: Int) -> (pos : Int) -> (max : Int) -> Buffer -> IOArray Int -> IO ()
+    bufferToArray : (origin: Int) -> (pos : Int) -> (max : Int) -> Buffer -> IOArray Bits16 -> IO ()
     bufferToArray origin pos max buf arr =
       if pos == max then
         pure ()
       else do
         n <- Buffer.getBits16 buf (pos * 2)
-        True <- IOArray.writeArray arr (origin + pos) (cast n)
+        True <- IOArray.writeArray arr (origin + pos) n
           | False => pure ()
         bufferToArray origin (pos + 1) max buf arr
 
