@@ -49,6 +49,15 @@ record OpBr where
 data OpCode =
  OP_BR OpBr
 
+Show OpCode where
+  show (OP_BR (MkOpBr pcOffset condFlag)) =
+    let
+      n = if (condFlag .&. 4) /= 0 then "n" else ""
+      z = if (condFlag .&. 2) /= 0 then "z" else ""
+      p = if (condFlag .&. 1) /= 0 then "p" else ""
+    in
+    "BR\{n}\{z}\{p} \{show pcOffset}"
+
 parseOpBr : Int16 -> Maybe OpCode
 parseOpBr instr =
   let pcOffset = signedBits 0 9 instr in
@@ -76,12 +85,13 @@ toString (MkMemory arr) = aux arr 0 ""
       else do
         opcode <- IOArray.readArray arr pos
         case opcode of
+          Just 0 => aux arr (pos + 1) acc
           Nothing => aux arr (pos + 1) acc
+
           Just opcode =>
-            if opcode == 0 then
-              aux arr (pos + 1) acc
-            else
-              aux arr (pos + 1) ("\{acc}\n\{show opcode}")
+            case parseOpCode op of
+              Just op => aux arr (pos + 1) ("\{acc}\{show op}\n")
+              Nothing => aux arr (pos + 1) acc
 
 readImage : String -> IO (Maybe Memory)
 readImage path = do
@@ -133,10 +143,8 @@ executeCommand : Command -> IO ()
 executeCommand (Disassemble file) = do
   Just image <- readImage file
     | Nothing => putStrLn "Could not read file \{show file}"
-
-  out <- toString image
-
-  putStrLn out
+  image <- toString image
+  putStrLn image
 
 executeCommand Help = do
   putStrLn "Supported commands\n\nlc3 disassemble [file]"
