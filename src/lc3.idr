@@ -12,14 +12,64 @@ import System.File.Handle
 memorySize : Int
 memorySize = shiftL 1 16
 
+bits: (pos : Nat) -> (width : Nat) -> Int16 -> Maybe Int16
+bits pos width num =
+  let
+    pos     = natToFin pos 16
+    width   = natToFin width 16
+    mask    = (1 `shiftL` !width) - 1
+    shifted = num `shiftR` !pos
+  in pure (shifted .&. mask)
+
+signExtend : Int16 -> (bitCount: Nat) -> Maybe Int16
+signExtend num bitCount =
+  let
+    signBit     = bits (pred bitCount) 1 num
+    bitCount    = natToFin bitCount 16
+    signMask    = 0xffff `shiftL` !bitCount
+    extendedNum = num .|. signMask
+  in
+  if !signBit == 0 then
+    pure num
+  else
+    pure extendedNum
+
+signedBits : (pos: Nat) -> (width: Nat) -> Int16 -> Maybe Int16
+signedBits pos width num =
+  let bitField = bits pos width num in
+  signExtend !bitField width
+
+data Register = R_R0 | R_R1 | R_R2 | R_R3 | R_R4 | R_R5 | R_R6 | R_R7
+
+record OpBr where
+  constructor MkOpBr
+  pcOffset : Int16
+  condFlag : Int16
+
+data OpCode =
+ OP_BR OpBr
+
+parseOpBr : Int16 -> Maybe OpCode
+parseOpBr instr =
+  let pcOffset = signedBits 0 9 instr in
+  let condFlag = bits 9 3 instr in
+  pure $ OP_BR (MkOpBr !pcOffset !condFlag)
+
+parseOpCode : (instr: Int16) -> Maybe OpCode
+parseOpCode instr =
+  let op = bits 12 4 instr in
+  case !op of
+    0 => parseOpBr instr
+    _ => Nothing
+
 record Memory where
   constructor MkMemory
-  array : IOArray Bits16
+  array : IOArray Int16
 
 toString : Memory -> IO String
 toString (MkMemory arr) = aux arr 0 ""
   where
-    aux : IOArray Bits16 -> Int -> String -> IO String
+    aux : IOArray Int16 -> Int -> String -> IO String
     aux arr pos acc =
       if pos + 1 == memorySize then
         pure acc
@@ -43,7 +93,7 @@ readImage path = do
               (\file => Buffer.readBufferData file originBuffer 0 2)
     | Left err => pure Nothing
 
-  origin <- Buffer.getBits16 originBuffer 0
+  origin <- Buffer.getInt16 originBuffer 0
   maxRead <- pure (memorySize - (cast origin))
 
   Just memoryBuffer <- Buffer.newBuffer memorySize
@@ -59,12 +109,12 @@ readImage path = do
 
   pure $ Just $ MkMemory memory
   where
-    bufferToArray : (origin: Int) -> (pos : Int) -> (max : Int) -> Buffer -> IOArray Bits16 -> IO ()
+    bufferToArray : (origin: Int) -> (pos : Int) -> (max : Int) -> Buffer -> IOArray Int16 -> IO ()
     bufferToArray origin pos max buf arr =
       if pos == max then
         pure ()
       else do
-        n <- Buffer.getBits16 buf (pos * 2)
+        n <- Buffer.getInt16 buf (pos * 2)
         True <- IOArray.writeArray arr (origin + pos) n
           | False => pure ()
         bufferToArray origin (pos + 1) max buf arr
