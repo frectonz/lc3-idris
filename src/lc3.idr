@@ -12,6 +12,10 @@ import System.File.Handle
 memorySize : Int
 memorySize = shiftL 1 16
 
+take : (fn : a -> Maybe b) -> Maybe a -> Maybe b
+take fn (Just x) = fn x
+take fn Nothing  = Nothing
+
 bits: (pos : Nat) -> (width : Nat) -> Int16 -> Maybe Int16
 bits pos width num =
   let
@@ -41,13 +45,47 @@ signedBits pos width num =
 
 data Register = R_R0 | R_R1 | R_R2 | R_R3 | R_R4 | R_R5 | R_R6 | R_R7
 
+asRegister : Int16 -> Maybe Register
+asRegister 0 = Just R_R0
+asRegister 1 = Just R_R1
+asRegister 2 = Just R_R2
+asRegister 3 = Just R_R3
+asRegister 4 = Just R_R4
+asRegister 5 = Just R_R5
+asRegister 6 = Just R_R6
+asRegister 7 = Just R_R7
+asRegister _ = Nothing
+
+Show Register where
+  show R_R0 = "R0"
+  show R_R1 = "R1"
+  show R_R2 = "R2"
+  show R_R3 = "R3"
+  show R_R4 = "R4"
+  show R_R5 = "R5"
+  show R_R6 = "R6"
+  show R_R7 = "R7"
+
+data RegisterOrValue = Val Int16 | Reg Register
+
+Show RegisterOrValue where
+  show (Val int) = show int
+  show (Reg reg) = show reg
+
 record OpBr where
   constructor MkOpBr
   pcOffset : Int16
   condFlag : Int16
 
+record TwoOperators where
+  constructor MkTwoOperators
+  dr  : Register
+  sr1 : Register
+  sr2 : RegisterOrValue
+
 data OpCode =
  OP_BR OpBr
+ | OP_AND TwoOperators
 
 Show OpCode where
   show (OP_BR (MkOpBr pcOffset condFlag)) =
@@ -58,17 +96,39 @@ Show OpCode where
     in
     "BR\{n}\{z}\{p} \{show pcOffset}"
 
+  show (OP_AND (MkTwoOperators dr sr1 sr2)) =
+    "AND \{show dr} \{show sr1} \{show sr2}"
+
 parseOpBr : Int16 -> Maybe OpCode
 parseOpBr instr =
   let pcOffset = signedBits 0 9 instr in
   let condFlag = bits 9 3 instr in
   pure $ OP_BR (MkOpBr !pcOffset !condFlag)
 
+parseTwoOperators : Int16 -> Maybe TwoOperators
+parseTwoOperators instr =
+  let
+    immFlag = bits 5 1 instr
+    dr      = take asRegister $ bits 9 3 instr
+    sr1     = take asRegister $ bits 6 3 instr
+  in
+  if !immFlag == 0 then
+    let r = take asRegister $ bits 0 3 instr in
+    Just (MkTwoOperators !dr !sr1 (Reg !r))
+  else
+    let v = signedBits 0 5 instr in
+    Just (MkTwoOperators !dr !sr1 (Val !v))
+
+parseOpAnd : Int16 -> Maybe OpCode
+parseOpAnd instr =
+  Just $ OP_AND $ !(parseTwoOperators instr)
+
 parseOpCode : (instr: Int16) -> Maybe OpCode
 parseOpCode instr =
   let op = bits 12 4 instr in
   case !op of
-    0 => parseOpBr instr
+    0 => parseOpBr  instr
+    1 => parseOpAnd instr
     _ => Nothing
 
 record Memory where
@@ -89,7 +149,7 @@ toString (MkMemory arr) = aux arr 0 ""
           Nothing => aux arr (pos + 1) acc
 
           Just opcode =>
-            case parseOpCode op of
+            case parseOpCode opcode of
               Just op => aux arr (pos + 1) ("\{acc}\{show op}\n")
               Nothing => aux arr (pos + 1) acc
 
