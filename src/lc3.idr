@@ -145,6 +145,7 @@ data OpCode =
  | OP_LDI LoadRegister
  | OP_STI LoadRegister
  | OP_JMP OpJmp
+ | OP_RES
 
 Show OpCode where
   show (OP_BR (MkOpBr pcOffset condFlag)) =
@@ -190,6 +191,8 @@ Show OpCode where
 
   show (OP_JMP (MkOpJmp dr)) =
     "JMP \{show dr}"
+
+  show (OP_RES) = "RES"
 
 parseOpBr : Int16 -> Maybe OpCode
 parseOpBr instr =
@@ -288,6 +291,9 @@ parseOpJmp instr =
   in
   Just $ OP_JMP $ MkOpJmp !dr
 
+parseOpRes : Int16 -> Maybe OpCode
+parseOpRes _ = Just OP_RES
+
 parseOpCode : (instr: Int16) -> Maybe OpCode
 parseOpCode instr =
   let op = bits 12 4 instr in
@@ -305,6 +311,7 @@ parseOpCode instr =
     10 => parseOpLdi instr
     11 => parseOpSti instr
     12 => parseOpJmp instr
+    13 => parseOpRes instr
     _ => Nothing
 
 record Memory where
