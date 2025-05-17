@@ -116,6 +116,7 @@ data OpCode =
    OP_BR  OpBr
  | OP_AND TwoOperators
  | OP_LD  LoadRegister
+ | OP_ST  LoadRegister
 
 Show OpCode where
   show (OP_BR (MkOpBr pcOffset condFlag)) =
@@ -132,6 +133,9 @@ Show OpCode where
 
   show (OP_LD (MkLoadRegister dr pcOffset)) =
     "LD \{show dr} \{toHexString pcOffset}"
+
+  show (OP_ST (MkLoadRegister dr pcOffset)) =
+    "ST \{show dr} \{toHexString pcOffset}"
 
 parseOpBr : Int16 -> Maybe OpCode
 parseOpBr instr =
@@ -157,13 +161,21 @@ parseOpAnd : Int16 -> Maybe OpCode
 parseOpAnd instr =
   Just $ OP_AND $ !(parseTwoOperators instr)
 
-parseOpLd : Int16 -> Maybe OpCode
-parseOpLd instr =
+parseLoadRegister : Int16 -> Maybe LoadRegister
+parseLoadRegister instr =
   let
     dr       = take asRegister $ bits 9 3 instr
     pcOffset = signedBits 0 9 instr
   in
-  Just $ OP_LD $ (MkLoadRegister !dr !pcOffset)
+  Just $ MkLoadRegister !dr !pcOffset
+
+parseOpLd : Int16 -> Maybe OpCode
+parseOpLd instr =
+  Just $ OP_LD $ !(parseLoadRegister instr)
+
+parseOpSt : Int16 -> Maybe OpCode
+parseOpSt instr =
+  Just $ OP_ST $ !(parseLoadRegister instr)
 
 parseOpCode : (instr: Int16) -> Maybe OpCode
 parseOpCode instr =
@@ -172,6 +184,7 @@ parseOpCode instr =
     0 => parseOpBr  instr
     1 => parseOpAnd instr
     2 => parseOpLd  instr
+    3 => parseOpSt  instr
     _ => Nothing
 
 record Memory where
