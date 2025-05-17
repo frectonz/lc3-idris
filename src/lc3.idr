@@ -138,6 +138,7 @@ data OpCode =
  | OP_STR RegOffset
  | OP_RTI
  | OP_NOT OpNot
+ | OP_LDI LoadRegister
 
 Show OpCode where
   show (OP_BR (MkOpBr pcOffset condFlag)) =
@@ -174,6 +175,9 @@ Show OpCode where
 
   show (OP_NOT (MkOpNot dr sr)) =
     "NOT \{show dr} \{show sr}"
+
+  show (OP_LDI (MkLoadRegister dr pcOffset)) =
+    "LDI \{show dr} \{toHexString pcOffset}"
 
 parseOpBr : Int16 -> Maybe OpCode
 parseOpBr instr =
@@ -257,20 +261,25 @@ parseOpNot instr =
   in
   Just $ OP_NOT $ MkOpNot !dr !sr
 
+parseOpLdi : Int16 -> Maybe OpCode
+parseOpLdi instr =
+  Just $ OP_LDI $ !(parseLoadRegister instr)
+
 parseOpCode : (instr: Int16) -> Maybe OpCode
 parseOpCode instr =
   let op = bits 12 4 instr in
   case !op of
-    0 => parseOpBr  instr
-    1 => parseOpAdd instr
-    2 => parseOpLd  instr
-    3 => parseOpSt  instr
-    4 => parseOpJsr instr
-    5 => parseOpAnd instr
-    6 => parseOpLdr instr
-    7 => parseOpStr instr
-    8 => parseOpRti instr
-    9 => parseOpNot instr
+    0  => parseOpBr  instr
+    1  => parseOpAdd instr
+    2  => parseOpLd  instr
+    3  => parseOpSt  instr
+    4  => parseOpJsr instr
+    5  => parseOpAnd instr
+    6  => parseOpLdr instr
+    7  => parseOpStr instr
+    8  => parseOpRti instr
+    9  => parseOpNot instr
+    10 => parseOpLdi instr
     _ => Nothing
 
 record Memory where
