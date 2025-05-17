@@ -112,11 +112,16 @@ record LoadRegister where
   dr       : Register
   pcOffset : Int16
 
+record OpJsr where
+  constructor MkOpJsr
+  sr       : RegisterOrValue
+
 data OpCode =
    OP_BR  OpBr
  | OP_AND TwoOperators
  | OP_LD  LoadRegister
  | OP_ST  LoadRegister
+ | OP_JSR OpJsr
 
 Show OpCode where
   show (OP_BR (MkOpBr pcOffset condFlag)) =
@@ -136,6 +141,9 @@ Show OpCode where
 
   show (OP_ST (MkLoadRegister dr pcOffset)) =
     "ST \{show dr} \{toHexString pcOffset}"
+
+  show (OP_JSR (MkOpJsr sr )) =
+    "JSR \{show sr}"
 
 parseOpBr : Int16 -> Maybe OpCode
 parseOpBr instr =
@@ -177,6 +185,16 @@ parseOpSt : Int16 -> Maybe OpCode
 parseOpSt instr =
   Just $ OP_ST $ !(parseLoadRegister instr)
 
+parseOpJsr : Int16 -> Maybe OpCode
+parseOpJsr instr =
+  let longFlag = bits 11 1 instr in
+  if !longFlag == 0 then
+    let r = take asRegister $ bits 6 3 instr in
+    Just $ OP_JSR $ MkOpJsr $ Reg $ !r
+  else
+    let longPcOffset = signedBits 0 11 instr in
+    Just $ OP_JSR $ MkOpJsr $ Val $ !longPcOffset
+
 parseOpCode : (instr: Int16) -> Maybe OpCode
 parseOpCode instr =
   let op = bits 12 4 instr in
@@ -185,6 +203,7 @@ parseOpCode instr =
     1 => parseOpAnd instr
     2 => parseOpLd  instr
     3 => parseOpSt  instr
+    4 => parseOpJsr instr
     _ => Nothing
 
 record Memory where
