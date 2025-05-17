@@ -118,7 +118,7 @@ record OpJsr where
 
 data OpCode =
    OP_BR  OpBr
- | OP_AND TwoOperators
+ | OP_ADD TwoOperators
  | OP_LD  LoadRegister
  | OP_ST  LoadRegister
  | OP_JSR OpJsr
@@ -133,8 +133,8 @@ Show OpCode where
     in
     "BR\{n}\{z}\{p} \{pcOffset}"
 
-  show (OP_AND (MkTwoOperators dr sr1 sr2)) =
-    "AND \{show dr} \{show sr1} \{show sr2}"
+  show (OP_ADD (MkTwoOperators dr sr1 sr2)) =
+    "ADD \{show dr} \{show sr1} \{show sr2}"
 
   show (OP_LD (MkLoadRegister dr pcOffset)) =
     "LD \{show dr} \{toHexString pcOffset}"
@@ -165,9 +165,9 @@ parseTwoOperators instr =
     let v = signedBits 0 5 instr in
     Just (MkTwoOperators !dr !sr1 (Val !v))
 
-parseOpAnd : Int16 -> Maybe OpCode
-parseOpAnd instr =
-  Just $ OP_AND $ !(parseTwoOperators instr)
+parseOpAdd : Int16 -> Maybe OpCode
+parseOpAdd instr =
+  Just $ OP_ADD $ !(parseTwoOperators instr)
 
 parseLoadRegister : Int16 -> Maybe LoadRegister
 parseLoadRegister instr =
@@ -200,7 +200,7 @@ parseOpCode instr =
   let op = bits 12 4 instr in
   case !op of
     0 => parseOpBr  instr
-    1 => parseOpAnd instr
+    1 => parseOpAdd instr
     2 => parseOpLd  instr
     3 => parseOpSt  instr
     4 => parseOpJsr instr
