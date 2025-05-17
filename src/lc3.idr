@@ -131,6 +131,7 @@ data OpCode =
  | OP_AND TwoOperators
  | OP_LDR RegOffset
  | OP_STR RegOffset
+ | OP_RTI
 
 Show OpCode where
   show (OP_BR (MkOpBr pcOffset condFlag)) =
@@ -162,6 +163,8 @@ Show OpCode where
 
   show (OP_STR (MkRegOffset dr sr offset)) =
     "STR \{show dr} \{show sr} \{toHexString offset}"
+
+  show (OP_RTI) = "RTI"
 
 parseOpBr : Int16 -> Maybe OpCode
 parseOpBr instr =
@@ -234,6 +237,9 @@ parseOpStr : Int16 -> Maybe OpCode
 parseOpStr instr =
   Just $ OP_STR $ !(parseRegOffset instr)
 
+parseOpRti : Int16 -> Maybe OpCode
+parseOpRti _ = Just OP_RTI
+
 parseOpCode : (instr: Int16) -> Maybe OpCode
 parseOpCode instr =
   let op = bits 12 4 instr in
@@ -246,6 +252,7 @@ parseOpCode instr =
     5 => parseOpAnd instr
     6 => parseOpLdr instr
     7 => parseOpStr instr
+    8 => parseOpRti instr
     _ => Nothing
 
 record Memory where
