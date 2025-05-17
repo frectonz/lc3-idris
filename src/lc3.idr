@@ -107,9 +107,15 @@ record TwoOperators where
   sr1 : Register
   sr2 : RegisterOrValue
 
+record LoadRegister where
+  constructor MkLoadRegister
+  dr       : Register
+  pcOffset : Int16
+
 data OpCode =
- OP_BR OpBr
+   OP_BR  OpBr
  | OP_AND TwoOperators
+ | OP_LD  LoadRegister
 
 Show OpCode where
   show (OP_BR (MkOpBr pcOffset condFlag)) =
@@ -123,6 +129,9 @@ Show OpCode where
 
   show (OP_AND (MkTwoOperators dr sr1 sr2)) =
     "AND \{show dr} \{show sr1} \{show sr2}"
+
+  show (OP_LD (MkLoadRegister dr pcOffset)) =
+    "LD \{show dr} \{toHexString pcOffset}"
 
 parseOpBr : Int16 -> Maybe OpCode
 parseOpBr instr =
@@ -148,12 +157,21 @@ parseOpAnd : Int16 -> Maybe OpCode
 parseOpAnd instr =
   Just $ OP_AND $ !(parseTwoOperators instr)
 
+parseOpLd : Int16 -> Maybe OpCode
+parseOpLd instr =
+  let
+    dr       = take asRegister $ bits 9 3 instr
+    pcOffset = signedBits 0 9 instr
+  in
+  Just $ OP_LD $ (MkLoadRegister !dr !pcOffset)
+
 parseOpCode : (instr: Int16) -> Maybe OpCode
 parseOpCode instr =
   let op = bits 12 4 instr in
   case !op of
     0 => parseOpBr  instr
     1 => parseOpAnd instr
+    2 => parseOpLd  instr
     _ => Nothing
 
 record Memory where
