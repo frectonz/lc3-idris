@@ -23,24 +23,24 @@ byteToHex n =
       lo = n .&. 0xF
   in hexDigit hi ++ hexDigit lo
 
--- Convert Int16 to hex string (big-endian by default)
-int16ToHex : Int16 -> String
-int16ToHex n =
+-- Convert Bits16 to hex string (big-endian by default)
+bits16ToHex : Bits16 -> String
+bits16ToHex n =
   let raw : Int = cast n -- widen to Int for safe bit ops
       hi = (raw `shiftR` 8) .&. 0xFF
       lo = raw .&. 0xFF
   in byteToHex hi ++ byteToHex lo
 
-toHexString : Int16 -> String
+toHexString : Bits16 -> String
 toHexString n =
-  let n = int16ToHex n in
+  let n = bits16ToHex n in
   "0x" ++ n
 
 take : (fn : a -> Maybe b) -> Maybe a -> Maybe b
 take fn (Just x) = fn x
 take fn Nothing  = Nothing
 
-bits: (pos : Nat) -> (width : Nat) -> Int16 -> Maybe Int16
+bits : (pos : Nat) -> (width : Nat) -> Bits16 -> Maybe Bits16
 bits pos width num =
   let
     pos     = natToFin pos 16
@@ -49,7 +49,7 @@ bits pos width num =
     shifted = num `shiftR` !pos
   in pure (shifted .&. mask)
 
-signExtend : Int16 -> (bitCount: Nat) -> Maybe Int16
+signExtend : Bits16 -> (bitCount: Nat) -> Maybe Bits16
 signExtend num bitCount =
   let
     signBit     = bits (pred bitCount) 1 num
@@ -62,14 +62,14 @@ signExtend num bitCount =
   else
     pure extendedNum
 
-signedBits : (pos: Nat) -> (width: Nat) -> Int16 -> Maybe Int16
+signedBits : (pos: Nat) -> (width: Nat) -> Bits16 -> Maybe Bits16
 signedBits pos width num =
   let bitField = bits pos width num in
   signExtend !bitField width
 
 data Register = R_R0 | R_R1 | R_R2 | R_R3 | R_R4 | R_R5 | R_R6 | R_R7
 
-asRegister : Int16 -> Maybe Register
+asRegister : Bits16 -> Maybe Register
 asRegister 0 = Just R_R0
 asRegister 1 = Just R_R1
 asRegister 2 = Just R_R2
@@ -90,7 +90,7 @@ Show Register where
   show R_R6 = "R6"
   show R_R7 = "R7"
 
-data RegisterOrValue = Val Int16 | Reg Register
+data RegisterOrValue = Val Bits16 | Reg Register
 
 Show RegisterOrValue where
   show (Val int) = toHexString int
@@ -98,8 +98,8 @@ Show RegisterOrValue where
 
 record OpBr where
   constructor MkOpBr
-  pcOffset : Int16
-  condFlag : Int16
+  pcOffset : Bits16
+  condFlag : Bits16
 
 record TwoOperators where
   constructor MkTwoOperators
@@ -110,7 +110,7 @@ record TwoOperators where
 record LoadRegister where
   constructor MkLoadRegister
   dr       : Register
-  pcOffset : Int16
+  pcOffset : Bits16
 
 record OpJsr where
   constructor MkOpJsr
@@ -120,7 +120,7 @@ record RegOffset where
   constructor MkRegOffset
   dr     : Register
   sr     : Register
-  offset : Int16
+  offset : Bits16
 
 record OpNot where
   constructor MkOpNot
@@ -141,7 +141,7 @@ Show Trap where
   show TRAP_PUTSP = "PUTSP"
   show TRAP_HALT  = "HALT"
 
-asTrap : Int16 -> Maybe Trap
+asTrap : Bits16 -> Maybe Trap
 asTrap 0x20 = Just TRAP_GETC
 asTrap 0x21 = Just TRAP_OUT
 asTrap 0x22 = Just TRAP_PUTS
@@ -221,13 +221,13 @@ Show OpCode where
   show (OP_TRAP trap) =
     "TRAP \{show trap}"
 
-parseOpBr : Int16 -> Maybe OpCode
+parseOpBr : Bits16 -> Maybe OpCode
 parseOpBr instr =
   let pcOffset = signedBits 0 9 instr in
   let condFlag = bits 9 3 instr in
   pure $ OP_BR (MkOpBr !pcOffset !condFlag)
 
-parseTwoOperators : Int16 -> Maybe TwoOperators
+parseTwoOperators : Bits16 -> Maybe TwoOperators
 parseTwoOperators instr =
   let
     immFlag = bits 5 1 instr
@@ -241,11 +241,11 @@ parseTwoOperators instr =
     let v = signedBits 0 5 instr in
     Just (MkTwoOperators !dr !sr1 (Val !v))
 
-parseOpAdd : Int16 -> Maybe OpCode
+parseOpAdd : Bits16 -> Maybe OpCode
 parseOpAdd instr =
   Just $ OP_ADD $ !(parseTwoOperators instr)
 
-parseLoadRegister : Int16 -> Maybe LoadRegister
+parseLoadRegister : Bits16 -> Maybe LoadRegister
 parseLoadRegister instr =
   let
     dr       = take asRegister $ bits 9 3 instr
@@ -253,15 +253,15 @@ parseLoadRegister instr =
   in
   Just $ MkLoadRegister !dr !pcOffset
 
-parseOpLd : Int16 -> Maybe OpCode
+parseOpLd : Bits16 -> Maybe OpCode
 parseOpLd instr =
   Just $ OP_LD $ !(parseLoadRegister instr)
 
-parseOpSt : Int16 -> Maybe OpCode
+parseOpSt : Bits16 -> Maybe OpCode
 parseOpSt instr =
   Just $ OP_ST $ !(parseLoadRegister instr)
 
-parseOpJsr : Int16 -> Maybe OpCode
+parseOpJsr : Bits16 -> Maybe OpCode
 parseOpJsr instr =
   let longFlag = bits 11 1 instr in
   if !longFlag == 0 then
@@ -271,11 +271,11 @@ parseOpJsr instr =
     let longPcOffset = signedBits 0 11 instr in
     Just $ OP_JSR $ MkOpJsr $ Val $ !longPcOffset
 
-parseOpAnd : Int16 -> Maybe OpCode
+parseOpAnd : Bits16 -> Maybe OpCode
 parseOpAnd instr =
   Just $ OP_AND $ !(parseTwoOperators instr)
 
-parseRegOffset : Int16 -> Maybe RegOffset
+parseRegOffset : Bits16 -> Maybe RegOffset
 parseRegOffset instr =
   let
     dr     = take asRegister $ bits 9 3 instr
@@ -284,18 +284,18 @@ parseRegOffset instr =
   in
   Just $ MkRegOffset !dr !sr !offset
 
-parseOpLdr : Int16 -> Maybe OpCode
+parseOpLdr : Bits16 -> Maybe OpCode
 parseOpLdr instr =
   Just $ OP_LDR $ !(parseRegOffset instr)
 
-parseOpStr : Int16 -> Maybe OpCode
+parseOpStr : Bits16 -> Maybe OpCode
 parseOpStr instr =
   Just $ OP_STR $ !(parseRegOffset instr)
 
-parseOpRti : Int16 -> Maybe OpCode
+parseOpRti : Bits16 -> Maybe OpCode
 parseOpRti _ = Just OP_RTI
 
-parseOpNot : Int16 -> Maybe OpCode
+parseOpNot : Bits16 -> Maybe OpCode
 parseOpNot instr =
   let
     dr = take asRegister $ bits 9 3 instr
@@ -303,32 +303,32 @@ parseOpNot instr =
   in
   Just $ OP_NOT $ MkOpNot !dr !sr
 
-parseOpLdi : Int16 -> Maybe OpCode
+parseOpLdi : Bits16 -> Maybe OpCode
 parseOpLdi instr =
   Just $ OP_LDI $ !(parseLoadRegister instr)
 
-parseOpSti : Int16 -> Maybe OpCode
+parseOpSti : Bits16 -> Maybe OpCode
 parseOpSti instr =
   Just $ OP_STI $ !(parseLoadRegister instr)
 
-parseOpJmp : Int16 -> Maybe OpCode
+parseOpJmp : Bits16 -> Maybe OpCode
 parseOpJmp instr =
   let dr = take asRegister $ bits 6 3 instr in
   Just $ OP_JMP $ MkOpJmp !dr
 
-parseOpRes : Int16 -> Maybe OpCode
+parseOpRes : Bits16 -> Maybe OpCode
 parseOpRes _ = Just OP_RES
 
-parseOpLea : Int16 -> Maybe OpCode
+parseOpLea : Bits16 -> Maybe OpCode
 parseOpLea instr =
   Just $ OP_LEA $ !(parseLoadRegister instr)
 
-parseTrap : Int16 -> Maybe OpCode
+parseTrap : Bits16 -> Maybe OpCode
 parseTrap instr =
   let trap = take asTrap $ bits 0 8 instr in
   Just $ OP_TRAP !trap
 
-parseOpCode : (instr: Int16) -> Maybe OpCode
+parseOpCode : (instr: Bits16) -> Maybe OpCode
 parseOpCode instr =
   let op = bits 12 4 instr in
   case !op of
@@ -352,12 +352,12 @@ parseOpCode instr =
 
 record Memory where
   constructor MkMemory
-  array : IOArray Int16
+  array : IOArray Bits16
 
 toString : Memory -> IO String
 toString (MkMemory arr) = aux arr 0 ""
   where
-    aux : IOArray Int16 -> Int -> String -> IO String
+    aux : IOArray Bits16 -> Int -> String -> IO String
     aux arr pos acc =
       if pos + 1 == memorySize then
         pure acc
@@ -374,39 +374,43 @@ toString (MkMemory arr) = aux arr 0 ""
 
 readImage : String -> IO (Maybe Memory)
 readImage path = do
-  Just originBuffer <- Buffer.newBuffer 2
-    | Nothing => pure Nothing
+  Right buf <- createBufferFromFile path
+    | Left _ => pure Nothing
 
-  Right _ <- Handle.withFile path Read
-              (\err => pure err)
-              (\file => Buffer.readBufferData file originBuffer 0 2)
-    | Left err => pure Nothing
+  bufSize <- Buffer.rawSize buf
+  if bufSize < 2 then pure Nothing else do
 
-  origin <- Buffer.getInt16 originBuffer 0
-  maxRead <- pure (memorySize - (cast origin))
+    -- Read and swap origin
+    rawOrigin <- Buffer.getBits16 buf 0
+    let origin = byteSwap16 rawOrigin
+    let start = cast origin
 
-  Just memoryBuffer <- Buffer.newBuffer memorySize
-    | Nothing => pure Nothing
+    let numWords = (bufSize - 2) `div` 2
+    let maxRead = min numWords (memorySize - start)
 
-  Right readBytes <- Handle.withFile path Read
-              (\err => pure err)
-              (\file => Buffer.readBufferData file memoryBuffer 0 maxRead)
-    | Left err => pure Nothing
+    memory <- IOArray.newArray memorySize
 
-  memory <- IOArray.newArray memorySize
-  bufferToArray (cast origin) 0 (div maxRead 2) memoryBuffer memory
+    fillMemory buf start 0 maxRead memory
 
-  pure $ Just $ MkMemory memory
+    pure $ Just $ MkMemory memory
+
   where
-    bufferToArray : (origin: Int) -> (pos : Int) -> (max : Int) -> Buffer -> IOArray Int16 -> IO ()
-    bufferToArray origin pos max buf arr =
-      if pos == max then
-        pure ()
+    -- helper to swap endianness of a 16-bit word
+    byteSwap16 : Bits16 -> Bits16
+    byteSwap16 x =
+      let hi = x `shiftR` 8
+          lo = (x .&. 0xFF) `shiftL` 8
+      in hi .|. lo
+
+    fillMemory : Buffer -> Int -> Int -> Int -> IOArray Bits16 -> IO ()
+    fillMemory buf origin pos max arr =
+      if pos == max then pure ()
       else do
-        n <- Buffer.getInt16 buf (pos * 2)
-        True <- IOArray.writeArray arr (origin + pos) n
+        val <- Buffer.getBits16 buf (2 + pos * 2)
+        let swapped = byteSwap16 val
+        True <- IOArray.writeArray arr (origin + pos) (cast swapped)
           | False => pure ()
-        bufferToArray origin (pos + 1) max buf arr
+        fillMemory buf origin (pos + 1) max arr
 
 data Command = Disassemble String | Help
 
