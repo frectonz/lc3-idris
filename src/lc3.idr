@@ -1,16 +1,40 @@
 module Lc3
 
-import System
 import Data.Bits
 import Data.Buffer
+import Data.String
 import Data.IOArray
 
+import System
 import System.File.Mode
 import System.File.Buffer
 import System.File.Handle
 
 memorySize : Int
 memorySize = shiftL 1 16
+
+hexDigit : Int -> String
+hexDigit n = if n < 10 then singleton $ chr (n + ord '0')
+                       else singleton $ chr (n - 10 + ord 'a')
+
+byteToHex : Int -> String
+byteToHex n =
+  let hi = (n `shiftR` 4) .&. 0xF
+      lo = n .&. 0xF
+  in hexDigit hi ++ hexDigit lo
+
+-- Convert Int16 to hex string (big-endian by default)
+int16ToHex : Int16 -> String
+int16ToHex n =
+  let raw : Int = cast n -- widen to Int for safe bit ops
+      hi = (raw `shiftR` 8) .&. 0xFF
+      lo = raw .&. 0xFF
+  in byteToHex hi ++ byteToHex lo
+
+toHexString : Int16 -> String
+toHexString n =
+  let n = int16ToHex n in
+  "0x" ++ n
 
 take : (fn : a -> Maybe b) -> Maybe a -> Maybe b
 take fn (Just x) = fn x
@@ -69,7 +93,7 @@ Show Register where
 data RegisterOrValue = Val Int16 | Reg Register
 
 Show RegisterOrValue where
-  show (Val int) = show int
+  show (Val int) = toHexString int
   show (Reg reg) = show reg
 
 record OpBr where
@@ -93,8 +117,9 @@ Show OpCode where
       n = if (condFlag .&. 4) /= 0 then "n" else ""
       z = if (condFlag .&. 2) /= 0 then "z" else ""
       p = if (condFlag .&. 1) /= 0 then "p" else ""
+      pcOffset = toHexString pcOffset
     in
-    "BR\{n}\{z}\{p} \{show pcOffset}"
+    "BR\{n}\{z}\{p} \{pcOffset}"
 
   show (OP_AND (MkTwoOperators dr sr1 sr2)) =
     "AND \{show dr} \{show sr1} \{show sr2}"
