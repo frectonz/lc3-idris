@@ -122,6 +122,7 @@ data OpCode =
  | OP_LD  LoadRegister
  | OP_ST  LoadRegister
  | OP_JSR OpJsr
+ | OP_AND TwoOperators
 
 Show OpCode where
   show (OP_BR (MkOpBr pcOffset condFlag)) =
@@ -144,6 +145,9 @@ Show OpCode where
 
   show (OP_JSR (MkOpJsr sr )) =
     "JSR \{show sr}"
+
+  show (OP_AND (MkTwoOperators dr sr1 sr2)) =
+    "AND \{show dr} \{show sr1} \{show sr2}"
 
 parseOpBr : Int16 -> Maybe OpCode
 parseOpBr instr =
@@ -195,6 +199,10 @@ parseOpJsr instr =
     let longPcOffset = signedBits 0 11 instr in
     Just $ OP_JSR $ MkOpJsr $ Val $ !longPcOffset
 
+parseOpAnd : Int16 -> Maybe OpCode
+parseOpAnd instr =
+  Just $ OP_AND $ !(parseTwoOperators instr)
+
 parseOpCode : (instr: Int16) -> Maybe OpCode
 parseOpCode instr =
   let op = bits 12 4 instr in
@@ -204,6 +212,7 @@ parseOpCode instr =
     2 => parseOpLd  instr
     3 => parseOpSt  instr
     4 => parseOpJsr instr
+    5 => parseOpAnd instr
     _ => Nothing
 
 record Memory where
