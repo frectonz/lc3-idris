@@ -122,6 +122,11 @@ record RegOffset where
   sr     : Register
   offset : Int16
 
+record OpNot where
+  constructor MkOpNot
+  dr     : Register
+  sr     : Register
+
 data OpCode =
    OP_BR  OpBr
  | OP_ADD TwoOperators
@@ -132,6 +137,7 @@ data OpCode =
  | OP_LDR RegOffset
  | OP_STR RegOffset
  | OP_RTI
+ | OP_NOT OpNot
 
 Show OpCode where
   show (OP_BR (MkOpBr pcOffset condFlag)) =
@@ -165,6 +171,9 @@ Show OpCode where
     "STR \{show dr} \{show sr} \{toHexString offset}"
 
   show (OP_RTI) = "RTI"
+
+  show (OP_NOT (MkOpNot dr sr)) =
+    "NOT \{show dr} \{show sr}"
 
 parseOpBr : Int16 -> Maybe OpCode
 parseOpBr instr =
@@ -240,6 +249,14 @@ parseOpStr instr =
 parseOpRti : Int16 -> Maybe OpCode
 parseOpRti _ = Just OP_RTI
 
+parseOpNot : Int16 -> Maybe OpCode
+parseOpNot instr =
+  let
+    dr = take asRegister $ bits 9 3 instr
+    sr = take asRegister $ bits 6 3 instr
+  in
+  Just $ OP_NOT $ MkOpNot !dr !sr
+
 parseOpCode : (instr: Int16) -> Maybe OpCode
 parseOpCode instr =
   let op = bits 12 4 instr in
@@ -253,6 +270,7 @@ parseOpCode instr =
     6 => parseOpLdr instr
     7 => parseOpStr instr
     8 => parseOpRti instr
+    9 => parseOpNot instr
     _ => Nothing
 
 record Memory where
