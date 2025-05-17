@@ -127,6 +127,10 @@ record OpNot where
   dr     : Register
   sr     : Register
 
+record OpJmp where
+  constructor MkOpJmp
+  dr     : Register
+
 data OpCode =
    OP_BR  OpBr
  | OP_ADD TwoOperators
@@ -140,6 +144,7 @@ data OpCode =
  | OP_NOT OpNot
  | OP_LDI LoadRegister
  | OP_STI LoadRegister
+ | OP_JMP OpJmp
 
 Show OpCode where
   show (OP_BR (MkOpBr pcOffset condFlag)) =
@@ -182,6 +187,9 @@ Show OpCode where
 
   show (OP_STI (MkLoadRegister dr pcOffset)) =
     "STI \{show dr} \{toHexString pcOffset}"
+
+  show (OP_JMP (MkOpJmp dr)) =
+    "JMP \{show dr}"
 
 parseOpBr : Int16 -> Maybe OpCode
 parseOpBr instr =
@@ -273,6 +281,13 @@ parseOpSti : Int16 -> Maybe OpCode
 parseOpSti instr =
   Just $ OP_STI $ !(parseLoadRegister instr)
 
+parseOpJmp : Int16 -> Maybe OpCode
+parseOpJmp instr =
+  let
+    dr = take asRegister $ bits 6 3 instr
+  in
+  Just $ OP_JMP $ MkOpJmp !dr
+
 parseOpCode : (instr: Int16) -> Maybe OpCode
 parseOpCode instr =
   let op = bits 12 4 instr in
@@ -289,6 +304,7 @@ parseOpCode instr =
     9  => parseOpNot instr
     10 => parseOpLdi instr
     11 => parseOpSti instr
+    12 => parseOpJmp instr
     _ => Nothing
 
 record Memory where
