@@ -131,22 +131,42 @@ record OpJmp where
   constructor MkOpJmp
   dr     : Register
 
+data Trap = TRAP_GETC | TRAP_OUT | TRAP_PUTS | TRAP_IN | TRAP_PUTSP | TRAP_HALT
+
+Show Trap where
+  show TRAP_GETC  = "GETC"
+  show TRAP_OUT   = "OUT"
+  show TRAP_PUTS  = "PUTS"
+  show TRAP_IN    = "IN"
+  show TRAP_PUTSP = "PUTSP"
+  show TRAP_HALT  = "HALT"
+
+asTrap : Int16 -> Maybe Trap
+asTrap 0x20 = Just TRAP_GETC
+asTrap 0x21 = Just TRAP_OUT
+asTrap 0x22 = Just TRAP_PUTS
+asTrap 0x23 = Just TRAP_IN
+asTrap 0x24 = Just TRAP_PUTSP
+asTrap 0x25 = Just TRAP_HALT
+asTrap _    = Nothing
+
 data OpCode =
-   OP_BR  OpBr
- | OP_ADD TwoOperators
- | OP_LD  LoadRegister
- | OP_ST  LoadRegister
- | OP_JSR OpJsr
- | OP_AND TwoOperators
- | OP_LDR RegOffset
- | OP_STR RegOffset
+   OP_BR   OpBr
+ | OP_ADD  TwoOperators
+ | OP_LD   LoadRegister
+ | OP_ST   LoadRegister
+ | OP_JSR  OpJsr
+ | OP_AND  TwoOperators
+ | OP_LDR  RegOffset
+ | OP_STR  RegOffset
  | OP_RTI
- | OP_NOT OpNot
- | OP_LDI LoadRegister
- | OP_STI LoadRegister
- | OP_JMP OpJmp
+ | OP_NOT  OpNot
+ | OP_LDI  LoadRegister
+ | OP_STI  LoadRegister
+ | OP_JMP  OpJmp
  | OP_RES
- | OP_LEA LoadRegister
+ | OP_LEA  LoadRegister
+ | OP_TRAP Trap
 
 Show OpCode where
   show (OP_BR (MkOpBr pcOffset condFlag)) =
@@ -197,6 +217,9 @@ Show OpCode where
 
   show (OP_LEA (MkLoadRegister dr pcOffset)) =
     "LEA \{show dr} \{toHexString pcOffset}"
+
+  show (OP_TRAP trap) =
+    "TRAP \{show trap}"
 
 parseOpBr : Int16 -> Maybe OpCode
 parseOpBr instr =
@@ -290,9 +313,7 @@ parseOpSti instr =
 
 parseOpJmp : Int16 -> Maybe OpCode
 parseOpJmp instr =
-  let
-    dr = take asRegister $ bits 6 3 instr
-  in
+  let dr = take asRegister $ bits 6 3 instr in
   Just $ OP_JMP $ MkOpJmp !dr
 
 parseOpRes : Int16 -> Maybe OpCode
@@ -301,6 +322,11 @@ parseOpRes _ = Just OP_RES
 parseOpLea : Int16 -> Maybe OpCode
 parseOpLea instr =
   Just $ OP_LEA $ !(parseLoadRegister instr)
+
+parseTrap : Int16 -> Maybe OpCode
+parseTrap instr =
+  let trap = take asTrap $ bits 0 8 instr in
+  Just $ OP_TRAP !trap
 
 parseOpCode : (instr: Int16) -> Maybe OpCode
 parseOpCode instr =
@@ -321,6 +347,7 @@ parseOpCode instr =
     12 => parseOpJmp instr
     13 => parseOpRes instr
     14 => parseOpLea instr
+    15 => parseTrap  instr
     _ => Nothing
 
 record Memory where
